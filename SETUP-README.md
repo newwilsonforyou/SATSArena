@@ -29,8 +29,9 @@ Upload `SATs-Practice-Arena.html` and `SATs-Dashboard.html` to the same place as
 and sees their own results.
 
 **B. Copy the files onto each computer**
-Both files must sit in the **same folder**, since they link to each other. Reading past papers also
-need the `Reading/` folder alongside them for the story-booklet PDFs.
+Both files must sit in the **same folder**, since they link to each other. They now live in
+`SATS/Game/`, and the Reading past-paper booklets are read from `SATS/Reading/` one level up — so keep
+the `Game` folder inside the `SATS` folder.
 
 ## Step 3 — First login
 
