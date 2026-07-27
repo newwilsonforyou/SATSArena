@@ -243,14 +243,14 @@ const MOCK = {
   reading   :{n:38,mins:60,label:"3 texts · 38 questions · 60 minutes"}
 };
 const READING_PDF = {
- "2016":"Reading/2016_KS2_English_Reading_Booklet.pdf",
- "2017":"Reading/ks2-english-2017-reading-booklet.pdf",
- "2018":"Reading/ks2-english-2018-reading-booklet.pdf",
- "2019":"Reading/ks2-english-2019-reading-booklet.pdf",
- "2022":"Reading/ks2-english-2022-reading-booklet.pdf",
- "2023":"Reading/2023_key_stage_2_English_reading_booklet.pdf",
- "2024":"Reading/STA248811e_2024_ks2_English_reading_Reading_booklet.pdf",
- "2025":"Reading/2025_KS2_English_reading_booklet.pdf"
+ "2016":"2016_KS2_English_Reading_Booklet.pdf",
+ "2017":"ks2-english-2017-reading-booklet.pdf",
+ "2018":"ks2-english-2018-reading-booklet.pdf",
+ "2019":"ks2-english-2019-reading-booklet.pdf",
+ "2022":"ks2-english-2022-reading-booklet.pdf",
+ "2023":"2023_key_stage_2_English_reading_booklet.pdf",
+ "2024":"STA248811e_2024_ks2_English_reading_Reading_booklet.pdf",
+ "2025":"2025_KS2_English_reading_booklet.pdf"
 };
 
 
@@ -636,7 +636,8 @@ function pickMode(m){
       <div class="chips" id="yrChips">${years.map(y=>`<button class="chip${y===sel.year?" on":""}" onclick="setYear('${y}',this)">${y}</button>`).join("")}</div>
       <div id="paperPick"></div>
       ${sel.subj==="reading"?`<div class="note" style="margin-top:16px">📖 <b>Reading past papers need the story booklet.</b>
-        Open <a id="pdfLink" href="#" target="_blank">this year's reading booklet PDF</a> (it's in your SATS folder), read the texts, then answer the questions here.</div>`:""}
+        Open <a id="pdfLink" href="#" onclick="return openBooklet(event)">this year's reading booklet PDF</a>, read the texts, then answer the questions here.
+        <span id="pdfMsg" style="display:block;margin-top:6px;color:#a35a00"></span></div>`:""}
       <div style="margin-top:22px"><button class="btn" onclick="startQuiz()">Start paper ▶</button></div>`;
     renderPaperPick();
   }
@@ -657,14 +658,14 @@ function setTopic(t,el){ sel.topic=t; only(el) }
 function setPassage(id,el){ sel.passage=id; only(el) }
 function setPaper(p,el){ sel.paper=p; only(el) }
 function setYear(y,el){ sel.year=y; only(el); renderPaperPick();
-  const l=document.getElementById("pdfLink"); if(l&&READING_PDF[y]) l.href=READING_PDF[y]; }
+  const l=document.getElementById("pdfLink"); if(l) l.dataset.year=y; }
 function renderPaperPick(){
   const box=document.getElementById("paperPick"); if(!box) return;
   const papers=[...new Set(BANK.filter(q=>q.subj===sel.subj&&q.mode==="past"&&q.year===sel.year).map(q=>q.paper))];
   sel.paperName=papers[0];
   box.innerHTML = papers.length>1? `<h3>Which paper?</h3><div class="chips">${papers.map((p,i)=>
     `<button class="chip${i===0?" on":""}" onclick="sel.paperName='${p}';only(this)">${esc(p)}</button>`).join("")}</div>`:"";
-  const l=document.getElementById("pdfLink"); if(l&&READING_PDF[sel.year]) l.href=READING_PDF[sel.year];
+  const l=document.getElementById("pdfLink"); if(l) l.dataset.year=sel.year;
 }
 
 /* ==================== QUIZ ENGINE ==================== */
@@ -900,6 +901,26 @@ function topicRow(t,v){
 function fmtT(s){ return s>=60?Math.floor(s/60)+"m "+(s%60)+"s":s+"s" }
 function replay(){ startQuiz() }
 
+
+/* Reading booklets may sit in ./Reading/ or ../Reading/ depending on where the
+   files were put. Find whichever exists, then open it. */
+const BOOKLET_ROOTS=["Reading/","../Reading/","SATS/Reading/"];
+async function openBooklet(ev){
+  ev.preventDefault();
+  const year=(document.getElementById("pdfLink").dataset.year)||sel.year;
+  const file=READING_PDF[year];
+  const note=document.getElementById("pdfMsg");
+  if(!file){ if(note) note.textContent="No booklet listed for "+year+"."; return false }
+  if(note) note.textContent="Looking for the booklet…";
+  for(const root of BOOKLET_ROOTS){
+    try{
+      const r=await fetch(root+encodeURIComponent(file),{method:"HEAD"});
+      if(r.ok){ if(note) note.textContent=""; window.open(root+encodeURIComponent(file),"_blank"); return false }
+    }catch(e){}
+  }
+  if(note) note.innerHTML='Could not find <b>'+esc(file)+'</b>. Put the <b>Reading</b> folder next to this page (or one level up), then try again.';
+  return false;
+}
 /* ==================== GO ==================== */
 boot();
 </script>
