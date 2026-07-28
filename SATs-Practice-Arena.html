@@ -25,7 +25,12 @@ header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 
   padding:9px 16px;border-radius:999px;font-weight:700;cursor:pointer;font-size:.92rem}
 .navbtn:hover{background:rgba(255,255,255,.26)}
 .navbtn.on{background:#fff;color:#231f5c;border-color:#fff}
-.who{display:flex;align-items:center;gap:8px;color:#fff;font-weight:700;font-size:.95rem}
+.who{display:flex;align-items:center;gap:8px;color:#fff;font-weight:700;font-size:.95rem;
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);border-radius:999px;
+  padding:4px 14px 4px 4px;cursor:pointer;font-family:inherit}
+.who:hover{background:rgba(255,255,255,.22)}
+.modal{position:fixed;inset:0;background:rgba(8,10,40,.66);display:grid;place-items:center;z-index:50;padding:16px}
+.modal .card{max-width:440px;width:100%}
 .av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:1.1rem;
   background:linear-gradient(135deg,#ffd166,#ff8fab)}
 .card{background:var(--card);border-radius:20px;padding:22px;box-shadow:0 18px 44px rgba(6,8,40,.34)}
@@ -78,6 +83,9 @@ input[type=text]:focus,input[type=password]:focus{outline:none;border-color:#636
 .pill.time{background:#fff3d6;color:#a35a00}
 .pill.time.low{background:#ffe1e6;color:#b3123a;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.5}}
+.aidots{color:#8a6100;font-size:.92rem}
+.aidots:after{content:"";animation:dots 1.2s steps(4,end) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
 .qtext{font-size:1.35rem;line-height:1.55;margin:10px 0 18px;white-space:pre-wrap}
 .passage{background:#f7f8ff;border:2px solid var(--line);border-radius:16px;padding:16px 18px;max-height:340px;overflow:auto;margin-bottom:16px}
 .passage p{margin:0 0 10px;line-height:1.62}
@@ -126,10 +134,10 @@ canvas{max-width:100%}
   <div class="logo">SATs <span>Practice Arena</span></div>
   <div class="spacer"></div>
   <div id="navbar" class="hide" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <div class="who"><span class="av" id="avEmoji">🦊</span><span id="whoName"></span></div>
+    <button class="who" id="whoBtn" onclick="openAvatar()" title="Change your avatar">
+      <span class="av" id="avEmoji">🦊</span><span id="whoName"></span></button>
     <button class="navbtn" id="btnPlay" onclick="go('home')">🎮 Play</button>
     <button class="navbtn" id="btnDash" onclick="openDash()">📊 My Dashboard</button>
-    <a class="navbtn" href="SATs-Dashboard.html">📈 Full dashboard</a>
     <button class="navbtn" onclick="logout()">Log out</button>
   </div>
 </header>
@@ -198,10 +206,23 @@ canvas{max-width:100%}
 
 <!-- SELF MARK (after mock) -->
 <section id="s-mark" class="card hide">
-  <h1>✏️ Mark your answers</h1>
-  <p class="sub">Some questions need a person to mark them. Read the accepted answer and be honest — it keeps your dashboard useful!</p>
+  <h1 id="markTitle">🤖 Marking your paper</h1>
+  <p class="sub" id="markSub">Reading your written answers against the official mark scheme…</p>
   <div id="markBody"></div>
 </section>
+
+<!-- AVATAR PICKER -->
+<div id="avModal" class="modal hide">
+  <div class="card">
+    <h1>Choose your avatar</h1>
+    <p class="sub">Tap one to change it. It saves to your account straight away.</p>
+    <div class="chips" id="avModalChips"></div>
+    <div id="avModalMsg"></div>
+    <div style="margin-top:20px;display:flex;gap:10px">
+      <button class="btn grey" onclick="closeAvatar()">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- MY DASHBOARD (simple) -->
 <section id="s-dash" class="card hide">
@@ -427,8 +448,79 @@ async function loadSessions(key){
   }
 }
 
+/* ---- change avatar ---- */
+async function sbPatch(table,query,body){
+  const r=await fetch(SB_URL+'/rest/v1/'+table+'?'+query,{method:'PATCH',
+    headers:sbH({Prefer:'return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok) throw new Error('update failed ('+r.status+')');
+  return r;
+}
+async function updateAvatar(key,avatar){
+  await sbPatch('sats_players','name_key=eq.'+encodeURIComponent(key),{avatar:avatar});
+  const l=L();
+  if(l.auth&&l.auth.key===key){ l.auth.avatar=avatar; }
+  if(l.known&&l.known[key]){ l.known[key].avatar=avatar; }
+  Lsave(l);
+}
+
+/* ---- parent / teacher accounts ----
+   Stored in the same sats_players table but with a "parent:" prefix on name_key,
+   so a parent login can never collide with a child login. */
+const P_PREFIX='parent:';
+function parentKey(n){ return P_PREFIX+nameKey(n) }
+async function parentSignUp(name,pass){
+  name=String(name).trim();
+  if(name.length<2) throw new Error('Please use at least 2 letters for your name.');
+  if(String(pass).length<6) throw new Error('Use at least 6 characters for a grown-up password.');
+  const rows=await sbGet('sats_players?select=id&name_key=eq.'+encodeURIComponent(parentKey(name)));
+  if(rows.length) throw new Error('A parent account with that name already exists — log in instead.');
+  const hash=await sha256(parentKey(name)+':'+String(pass));
+  await sbPost('sats_players',{name:name,name_key:parentKey(name),avatar:'👩‍🏫',pass_hash:hash},{Prefer:'return=minimal'});
+  const a={name:name,key:parentKey(name),avatar:'👩‍🏫',hash:hash,parent:true};
+  Lsave(Object.assign(L(),{parent:a}));
+  return a;
+}
+async function parentLogIn(name,pass){
+  const hash=await sha256(parentKey(name)+':'+String(pass));
+  const rows=await sbGet('sats_players?select=*&name_key=eq.'+encodeURIComponent(parentKey(name)));
+  const row=rows[0];
+  if(!row) throw new Error('No parent account with that name — create one first.');
+  if(row.pass_hash!==hash) throw new Error('That password does not match.');
+  const a={name:row.name,key:row.name_key,avatar:row.avatar||'👩‍🏫',hash:hash,parent:true};
+  Lsave(Object.assign(L(),{parent:a}));
+  return a;
+}
+function parentAuthed(){ const l=L(); return (l.parent&&l.parent.key)?l.parent:null }
+function parentLogout(){ const l=L(); delete l.parent; Lsave(l) }
+async function listChildren(){
+  const rows=await sbGet('sats_players?select=name,name_key,avatar&order=name.asc&limit=500');
+  return rows.filter(r=>r.name_key&&r.name_key.indexOf(P_PREFIX)!==0);
+}
+
+/* ---- optional AI marking (Supabase Edge Function "mark-answer") ----
+   The Anthropic key lives as a secret on Supabase, never in this file.
+   If the function is not deployed, AI_ON stays false and the buttons never show. */
+const AI_URL=SB_URL+'/functions/v1/mark-answer';
+let AI_ON=false;
+async function aiProbe(){
+  try{
+    const r=await fetch(AI_URL,{method:'POST',headers:sbH(),
+      body:JSON.stringify({question:'ping',accepted:'ping',given:'',maxMarks:1})});
+    AI_ON = r.status!==404 && r.status!==401 && r.status!==403;
+  }catch(e){ AI_ON=false }
+  return AI_ON;
+}
+async function aiMark(q,given){
+  const r=await fetch(AI_URL,{method:'POST',headers:sbH(),
+    body:JSON.stringify({question:q.q,accepted:q.a,given:given||'',maxMarks:q.marks||1})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||typeof d.marks!=='number') throw new Error(d.error||'AI marking is unavailable right now.');
+  return d;   // {marks, reason}
+}
+
 /* ==================== AUTH UI ==================== */
-const AVATARS=["🦊","🐼","🦉","🐙","🦁","🐢","🦄","🐝","🐨","🦕","🐬","🐧"];
+const AVATARS=["🦊","🐼","🦉","🐙","🦁","🐢","🦄","🐝","🐨","🦕","🐬","🐧","🐸","🐳","🦋","🐝",
+ "🐯","🐰","🐻","🐮","🐷","🐵","🦜","🦈","🐴","🐺","🦔","🐲","⭐","🚀","⚽","🎸"];
 let user=null;      // {name,key,avatar,hash}
 let MY=[];          // this child's completed tests (oldest first)
 let CLOUD_OK=true;  // did the last cloud read work?
@@ -471,6 +563,7 @@ async function doAuth(){
   }
 }
 async function afterLogin(){
+  aiProbe().catch(()=>{});
   document.getElementById("whoName").textContent=user.name;
   document.getElementById("avEmoji").textContent=user.avatar||"🙂";
   await flushQueue();
@@ -585,14 +678,34 @@ function renderDash(){
        return `<tr><td>${dateTimeCell(s.date)}</td><td>${topicCell(s)}</td>
          <td><b style="color:${p>=70?"#16a34a":p>=50?"#b45309":"#e11d48"}">${s.got}/${s.max} · ${p}%</b></td></tr>`;
      }).join("")}</tbody></table></div>
-   <div class="note" style="margin-top:16px">Want your strengths, weak topics and progress charts?
-     Open the <b>Full dashboard</b>.</div>
    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-     <a class="btn" href="SATs-Dashboard.html">📈 Full dashboard</a>
-     <button class="btn grey" onclick="go('home')">🎮 Practise now</button>
+     <button class="btn" onclick="go('home')">🎮 Practise now</button>
    </div>`;
 }
 
+
+/* ==================== AVATAR PICKER ==================== */
+function openAvatar(){
+  if(!user) return;
+  document.getElementById("avModalChips").innerHTML=AVATARS.map(x=>
+    `<button class="chip avpick${x===user.avatar?" on":""}" onclick="chooseAvatar('${x}',this)">${x}</button>`).join("");
+  document.getElementById("avModalMsg").innerHTML="";
+  document.getElementById("avModal").classList.remove("hide");
+}
+function closeAvatar(){ document.getElementById("avModal").classList.add("hide") }
+async function chooseAvatar(a,el){
+  [...el.parentNode.children].forEach(c=>c.classList.remove("on")); el.classList.add("on");
+  const box=document.getElementById("avModalMsg");
+  try{
+    await updateAvatar(user.key,a);
+    user.avatar=a;
+    document.getElementById("avEmoji").textContent=a;
+    box.innerHTML='<div class="msg ok">Saved! ' + a + '</div>';
+    setTimeout(closeAvatar,700);
+  }catch(e){
+    box.innerHTML='<div class="msg err">Could not save right now — check your internet and try again.</div>';
+  }
+}
 
 /* ==================== SETUP ==================== */
 let sel={subj:null,mode:null,year:null,count:10,topic:"",paper:null};
@@ -759,36 +872,59 @@ function correct(given,accepted){
   }
   return false;
 }
-function submitAnswer(){
+async function submitAnswer(){
   const q=S.qs[S.i], given=document.getElementById("qInput").value;
   const max=q.marks||1;
   if(S.timed){ S.answers.push({q,given,got:null,max}); next(); return; }
   if(q.auto){
     const ok=correct(given,q.a);
     S.answers.push({q,given,got:ok?max:0,max});
-    feedback(ok,q,given);
-  } else {
-    S.answers.push({q,given,got:null,max});
-    selfMarkInline(q,given,max);
+    feedback(ok?max:0,max,q,given,"");
+    return;
+  }
+  S.answers.push({q,given,got:null,max});
+  if(!AI_ON){ selfMarkInline(q,given,max); return; }
+  /* AI does the marking */
+  document.getElementById("qInput").disabled=true;
+  document.getElementById("qGo").disabled=true;
+  document.getElementById("qFeedback").innerHTML=
+    '<div class="fb self"><b>🤖 Marking your answer…</b><div class="aidots" style="margin-top:8px">Reading the mark scheme</div></div>';
+  try{
+    const r=await aiMark(q,given);
+    S.answers[S.answers.length-1].got=r.marks;
+    feedback(r.marks,max,q,given,r.reason||"");
+  }catch(err){
+    /* AI unreachable — fall back to self-marking so nothing is lost */
+    selfMarkInline(q,given,max,"⚠️ "+(err.message||"AI marking unavailable")+" — mark it yourself this time.");
   }
 }
-function feedback(ok,q,given){
+function feedback(got,max,q,given,reason){
   const praise=["Brilliant!","Nice work!","Spot on!","Well done!","Excellent!","You've got it!"];
+  const full=got===max, none=got===0;
+  const head = full ? "✅ "+praise[Math.floor(Math.random()*praise.length)]
+             : none ? "❌ Not quite"
+             : "◐ Almost there";
+  const cls  = full ? "ok" : none ? "no" : "self";
   document.getElementById("qFeedback").innerHTML=
-    `<div class="fb ${ok?"ok":"no"}"><b>${ok?"✅ "+praise[Math.floor(Math.random()*praise.length)]:"❌ Not quite"}</b>
-     ${ok?"":`<div style="margin-top:8px">You wrote: <b>${esc(given||"(nothing)")}</b></div>
-       <div style="margin-top:4px">Correct answer: <b>${esc(q.a)}</b></div>`}</div>`;
+    `<div class="fb ${cls}">
+       <b>${head} — ${got}/${max} mark${max>1?"s":""}</b>
+       ${reason?`<div style="margin-top:8px">🤖 ${esc(reason)}</div>`:""}
+       ${full&&!reason?"":`<div style="margin-top:8px">You wrote: <b>${esc(given||"(nothing)")}</b></div>
+         <div style="margin-top:4px">Mark scheme: ${esc(q.a)}</div>`}
+     </div>`;
   lockAndNext();
 }
-function selfMarkInline(q,given,max){
+function selfMarkInline(q,given,max,warn){
   const opts=[...Array(max+1).keys()];
   document.getElementById("qFeedback").innerHTML=
-    `<div class="fb self"><b>📋 Mark scheme</b>
+    `<div class="fb self">${warn?`<div style="color:#b3123a;font-weight:800;margin-bottom:8px">${esc(warn)}</div>`:""}<b>📋 Mark scheme</b>
       <div style="margin-top:8px">You wrote: <b>${esc(given||"(nothing)")}</b></div>
       <div style="margin-top:8px;line-height:1.6">${esc(q.a)}</div>
       <div style="margin-top:10px;color:#8a6100;font-size:.9rem">How many marks does your answer earn?</div>
-      <div class="selfbtns">${opts.map(n=>
+      <div class="selfbtns" id="selfBtns">${opts.map(n=>
         `<button class="btn ${n===max?"green":n===0?"grey":""} sm" onclick="awardInline(${n})">${n===0?"❌ 0 marks":(n===max?"✅ "+n+" mark"+(n>1?"s":""):n+" mark"+(n>1?"s":""))}</button>`).join("")}</div>
+      ${AI_ON?`<div style="margin-top:10px"><button class="btn sm" id="aiBtn" onclick="aiMarkInline()">🤖 Ask AI to mark</button>
+        <span id="aiOut" style="margin-left:10px;font-size:.92rem"></span></div>`:""}
     </div>`;
   document.getElementById("qInput").disabled=true;
   document.getElementById("qGo").disabled=true;
@@ -808,11 +944,45 @@ function next(){ S.i++; if(S.i>=S.qs.length) finish(); else showQ(); }
 function quitQuiz(){ if(confirm("Quit this test? Your score won't be saved.")){ clearInterval(S&&S.tid); go("home") } }
 
 /* ==================== SELF-MARK PAGE (mock) ==================== */
-function finish(){
+async function finish(){
   clearInterval(S.tid);
   S.secs=Math.round((Date.now()-S.start)/1000);
+  /* auto-markable ones first */
+  S.answers.forEach(a=>{ if(a.got===null && a.q.auto) a.got = correct(a.given,a.q.a)?a.max:0 });
   const pending=S.answers.filter(a=>a.got===null);
-  if(pending.length){ renderMarkPage(); go("mark"); } else { saveAndShow(); }
+  if(!pending.length){ saveAndShow(); return }
+  if(AI_ON){ await aiMarkWholePaper(pending); return }
+  renderMarkPage(); go("mark");
+}
+/* Marks every written answer with AI, showing progress. No buttons for the child. */
+async function aiMarkWholePaper(pending){
+  go("mark");
+  const total=pending.length;
+  const box=document.getElementById("markBody");
+  document.getElementById("markTitle").textContent="🤖 Marking your paper";
+  document.getElementById("markSub").textContent=
+    "The marker is reading your written answers against the official mark scheme. This takes a few seconds.";
+  let done=0, failed=[];
+  const draw=()=>{ box.innerHTML=`
+    <div class="bar" style="height:16px"><i style="width:${Math.round(100*done/total)}%"></i></div>
+    <p class="sub" style="margin-top:12px">Marked ${done} of ${total} written answers…</p>`; };
+  draw();
+  for(const a of pending){
+    try{
+      const r=await aiMark(a.q,a.given);
+      a.got=r.marks; a.aiReason=r.reason||"";
+    }catch(e){ failed.push(a) }
+    done++; draw();
+  }
+  if(failed.length){
+    /* couldn't reach the marker for some — let a grown-up finish those */
+    document.getElementById("markTitle").textContent="✏️ A few to finish";
+    document.getElementById("markSub").textContent=
+      "The AI marker could not be reached for these. Mark them against the scheme shown.";
+    renderMarkPage();
+    return;
+  }
+  saveAndShow();
 }
 function renderMarkPage(){
   const pend=S.answers.map((a,i)=>({a,i})).filter(x=>x.a.got===null);
@@ -824,10 +994,14 @@ function renderMarkPage(){
       <div class="a">Your answer: <b>${esc(a.given||"(blank)")}</b></div>
       <div class="a" style="margin-top:6px">Accepted: ${esc(a.q.a)}</div>
       <div class="selfbtns">${[...Array(max+1).keys()].map(n=>
-        `<button class="btn ${n===max?"green":n===0?"grey":""} sm" onclick="awardPage(${i},${n},this)">${n} mark${n===1?"":"s"}</button>`).join("")}</div>
+        `<button class="btn ${n===max?"green":n===0?"grey":""} sm" onclick="awardPage(${i},${n},this)">${n} mark${n===1?"":"s"}</button>`).join("")}
+</div>
+      <div class="a" id="aiOut${i}"></div>
     </div>`;
-  }).join("") + `<div style="margin-top:18px"><button class="btn" id="mkDone" onclick="doneMarking()">See my results ▶</button>
-   <span id="mkLeft" style="margin-left:12px;color:var(--muted)"></span></div>`;
+  }).join("") + `<div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+   ${AI_ON?'<button class="btn grey" id="aiAll" onclick="aiMarkAll()">🤖 Try AI again</button>':''}
+   <button class="btn" id="mkDone" onclick="doneMarking()">See my results ▶</button>
+   <span id="mkLeft" style="color:var(--muted)"></span></div>`;
   updLeft();
 }
 function awardPage(i,n,el){
@@ -889,7 +1063,8 @@ function renderResults(rec){
     return `<div class="rev ${ok?"ok":part?"":"no"}">
       <div class="q">${ok?"✅":part?"◐":"❌"} Q${i+1}. ${esc(a.q.q)}</div>
       <div class="a">Your answer: <b>${esc(a.given||"(blank)")}</b> · ${a.got}/${a.max} marks</div>
-      <div class="a">Answer: ${esc(a.q.a)}</div>
+      ${a.aiReason?`<div class="a">🤖 ${esc(a.aiReason)}</div>`:""}
+      <div class="a">Mark scheme: ${esc(a.q.a)}</div>
       <div class="a"><span class="badge">${esc(a.q.topic)}</span></div></div>`;
   }).join("");
 }
@@ -920,6 +1095,50 @@ async function openBooklet(ev){
   }
   if(note) note.innerHTML='Could not find <b>'+esc(file)+'</b>. Put the <b>Reading</b> folder next to this page (or one level up), then try again.';
   return false;
+}
+
+/* ==================== AI MARKING (optional) ==================== */
+async function aiMarkInline(){
+  const btn=document.getElementById("aiBtn"), out=document.getElementById("aiOut");
+  const a=S.answers[S.answers.length-1];
+  btn.disabled=true; btn.textContent="🤖 Marking…"; out.textContent="";
+  try{
+    const r=await aiMark(a.q,a.given);
+    out.innerHTML=`<b>${r.marks}/${a.max}</b> — ${esc(r.reason||"")} <i style="color:#8a6100">(you can change it)</i>`;
+    const btns=document.getElementById("selfBtns");
+    if(btns&&btns.children[r.marks]) btns.children[r.marks].style.outline="3px solid #312e81";
+    a.got=r.marks;
+    lockAndNext();
+  }catch(err){
+    out.innerHTML=`<span style="color:#b3123a">${esc(err.message)}</span>`;
+  }finally{ btn.disabled=false; btn.textContent="🤖 Ask AI to mark" }
+}
+async function aiMarkOne(i,btn){
+  const a=S.answers[i], out=document.getElementById("aiOut"+i);
+  if(btn){ btn.disabled=true; btn.textContent="…" }
+  try{
+    const r=await aiMark(a.q,a.given);
+    a.got=r.marks;
+    out.innerHTML=`🤖 <b>${r.marks}/${a.max}</b> — ${esc(r.reason||"")}`;
+    const row=document.getElementById("mk"+i);
+    const marks=row?row.querySelectorAll(".selfbtns .btn"):[];
+    marks.forEach(b=>b.style.outline="");
+    if(marks[r.marks]) marks[r.marks].style.outline="3px solid #312e81";
+    updLeft();
+  }catch(e){
+    out.innerHTML=`<span style="color:#b3123a">${esc(e.message)}</span>`;
+  }finally{ if(btn){ btn.disabled=false; btn.textContent="🤖 AI" } }
+}
+async function aiMarkAll(){
+  const btn=document.getElementById("aiAll");
+  const todo=S.answers.map((a,i)=>({a,i})).filter(x=>x.a.got===null&&!x.a.q.auto);
+  btn.disabled=true;
+  for(let n=0;n<todo.length;n++){
+    btn.textContent=`🤖 Marking ${n+1} of ${todo.length}…`;
+    await aiMarkOne(todo[n].i,null);
+  }
+  btn.textContent="🤖 Marked"; btn.disabled=false;
+  updLeft();
 }
 /* ==================== GO ==================== */
 boot();

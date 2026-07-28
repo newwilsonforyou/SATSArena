@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SATs Practice Arena — Full Dashboard</title>
+<title>SATs Practice Arena — Parent &amp; Teacher Dashboard</title>
 <style>
 :root{--card:#ffffff;--ink:#1b1f3b;--muted:#6b7194;--line:#e6e8f5}
 *{box-sizing:border-box}
@@ -59,6 +59,12 @@ tbody tr:hover{background:#f8f9ff}
 .msg{margin-bottom:14px;border-radius:12px;padding:12px 14px;font-size:.94rem;line-height:1.45}
 .msg.info{background:#eef6ff;border:2px solid #bcdcff;color:#12447d}
 .msg.err{background:#fff0f3;border:2px solid #ffc0cd;color:#a1103a}
+.msg.ok{background:#e7f9ee;border:2px solid #86e0a8;color:#106b34}
+.hide{display:none !important}
+input[type=text],input[type=password]{width:100%;padding:14px 16px;border:2px solid var(--line);border-radius:14px;font-size:1.05rem;font-family:inherit}
+input[type=text]:focus,input[type=password]:focus{outline:none;border-color:#6366f1}
+.lbl{display:block;font-weight:800;font-size:.85rem;color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:640px){.tp .nm{width:130px;font-size:.82rem}.wrap{padding:10px}}
 </style>
 </head>
@@ -67,18 +73,39 @@ tbody tr:hover{background:#f8f9ff}
 <header class="top">
   <div class="logo">SATs <span>Practice Arena</span></div>
   <div class="spacer"></div>
-  <div id="navbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <div class="who"><span class="av" id="avEmoji">🙂</span><span id="whoName"></span></div>
-    <a class="navbtn" href="SATs-Practice-Arena.html">🎮 Play</a>
-    <a class="navbtn" href="SATs-Practice-Arena.html">📊 My Dashboard</a>
+  <div id="navbar" class="hide" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div class="who"><span class="av" id="avEmoji">👩‍🏫</span><span id="whoName"></span></div>
+    <a class="navbtn" href="SATs-Practice-Arena.html">🎮 Game</a>
     <button class="navbtn on">📈 Full dashboard</button>
     <button class="navbtn" onclick="logout()">Log out</button>
   </div>
 </header>
 
-<section class="card">
+<!-- PARENT LOCK -->
+<section id="s-lock" class="card hide">
+  <h1>🔒 Parent &amp; teacher only</h1>
+  <p class="sub">This page shows a child's strengths, weak topics and full history. Log in with your
+    grown-up account to see it.</p>
+  <div class="tabbtns">
+    <button class="chip on" id="pTabLogin" onclick="pTab('login')">Log in</button>
+    <button class="chip" id="pTabNew" onclick="pTab('new')">Create parent account</button>
+  </div>
+  <div style="max-width:440px">
+    <label class="lbl" for="pName">Your name</label>
+    <input type="text" id="pName" placeholder="e.g. Wilson" maxlength="24" autocomplete="username">
+    <label class="lbl" for="pPass">Password</label>
+    <input type="password" id="pPass" placeholder="at least 6 characters" autocomplete="current-password">
+    <div style="margin-top:20px"><button class="btn" id="pGo" onclick="doParentAuth()">Log in ▶</button></div>
+    <div id="pMsg"></div>
+  </div>
+  <div style="margin-top:24px"><a class="btn grey" href="SATs-Practice-Arena.html">← Back to the game</a></div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="s-dash" class="card hide">
   <h1 id="dashTitle">📈 Full Dashboard</h1>
   <p class="sub" id="dashSub"></p>
+  <div id="kidPick" style="margin-bottom:18px"></div>
   <div id="dashBody"></div>
 </section>
 </div>
@@ -264,8 +291,58 @@ async function loadSessions(key){
   }
 }
 
+/* ---- change avatar ---- */
+async function sbPatch(table,query,body){
+  const r=await fetch(SB_URL+'/rest/v1/'+table+'?'+query,{method:'PATCH',
+    headers:sbH({Prefer:'return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok) throw new Error('update failed ('+r.status+')');
+  return r;
+}
+async function updateAvatar(key,avatar){
+  await sbPatch('sats_players','name_key=eq.'+encodeURIComponent(key),{avatar:avatar});
+  const l=L();
+  if(l.auth&&l.auth.key===key){ l.auth.avatar=avatar; }
+  if(l.known&&l.known[key]){ l.known[key].avatar=avatar; }
+  Lsave(l);
+}
+
+/* ---- parent / teacher accounts ----
+   Stored in the same sats_players table but with a "parent:" prefix on name_key,
+   so a parent login can never collide with a child login. */
+const P_PREFIX='parent:';
+function parentKey(n){ return P_PREFIX+nameKey(n) }
+async function parentSignUp(name,pass){
+  name=String(name).trim();
+  if(name.length<2) throw new Error('Please use at least 2 letters for your name.');
+  if(String(pass).length<6) throw new Error('Use at least 6 characters for a grown-up password.');
+  const rows=await sbGet('sats_players?select=id&name_key=eq.'+encodeURIComponent(parentKey(name)));
+  if(rows.length) throw new Error('A parent account with that name already exists — log in instead.');
+  const hash=await sha256(parentKey(name)+':'+String(pass));
+  await sbPost('sats_players',{name:name,name_key:parentKey(name),avatar:'👩‍🏫',pass_hash:hash},{Prefer:'return=minimal'});
+  const a={name:name,key:parentKey(name),avatar:'👩‍🏫',hash:hash,parent:true};
+  Lsave(Object.assign(L(),{parent:a}));
+  return a;
+}
+async function parentLogIn(name,pass){
+  const hash=await sha256(parentKey(name)+':'+String(pass));
+  const rows=await sbGet('sats_players?select=*&name_key=eq.'+encodeURIComponent(parentKey(name)));
+  const row=rows[0];
+  if(!row) throw new Error('No parent account with that name — create one first.');
+  if(row.pass_hash!==hash) throw new Error('That password does not match.');
+  const a={name:row.name,key:row.name_key,avatar:row.avatar||'👩‍🏫',hash:hash,parent:true};
+  Lsave(Object.assign(L(),{parent:a}));
+  return a;
+}
+function parentAuthed(){ const l=L(); return (l.parent&&l.parent.key)?l.parent:null }
+function parentLogout(){ const l=L(); delete l.parent; Lsave(l) }
+async function listChildren(){
+  const rows=await sbGet('sats_players?select=name,name_key,avatar&order=name.asc&limit=500');
+  return rows.filter(r=>r.name_key&&r.name_key.indexOf(P_PREFIX)!==0);
+}
+
 /* ==================== FULL DASHBOARD ==================== */
 let user=null, dashFilter="all", ALL=[], OFFLINE=false;
+let parent=null, KIDS=[], kid=null, pMode="login", pBusy=false;
 
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
 function fmtT(s){ return s>=60?Math.floor(s/60)+"m "+(s%60)+"s":s+"s" }
@@ -319,28 +396,75 @@ function when(t){
 }
 function setFilter(f){ dashFilter=f; render() }
 
+function screen(id){
+  ["lock","dash"].forEach(x=>document.getElementById("s-"+x).classList.toggle("hide",x!==id));
+  document.getElementById("navbar").classList.toggle("hide",id!=="dash");
+  window.scrollTo(0,0);
+}
+function pTab(m){
+  pMode=m;
+  document.getElementById("pTabLogin").classList.toggle("on",m==="login");
+  document.getElementById("pTabNew").classList.toggle("on",m==="new");
+  document.getElementById("pGo").textContent=m==="login"?"Log in ▶":"Create account ▶";
+  document.getElementById("pPass").setAttribute("autocomplete",m==="login"?"current-password":"new-password");
+  document.getElementById("pMsg").innerHTML="";
+}
+function pMsg(kind,text){ document.getElementById("pMsg").innerHTML=`<div class="msg ${kind}">${text}</div>` }
+async function doParentAuth(){
+  if(pBusy) return; pBusy=true;
+  const btn=document.getElementById("pGo"), was=btn.textContent;
+  btn.disabled=true; btn.textContent="Please wait…";
+  try{
+    const n=document.getElementById("pName").value.trim(), p=document.getElementById("pPass").value;
+    if(!n) throw new Error("Please type your name.");
+    if(!p) throw new Error("Please type your password.");
+    parent = pMode==="new" ? await parentSignUp(n,p) : await parentLogIn(n,p);
+    await afterParent();
+  }catch(e){ pMsg("err","⚠️ "+esc(e.message||String(e))) }
+  finally{ pBusy=false; btn.disabled=false; btn.textContent=was }
+}
+async function afterParent(){
+  document.getElementById("whoName").textContent=parent.name;
+  document.getElementById("avEmoji").textContent=parent.avatar||"👩‍🏫";
+  screen("dash");
+  document.getElementById("dashBody").innerHTML='<p class="sub">Loading children…</p>';
+  try{ KIDS=await listChildren() }catch(e){ KIDS=[] }
+  const signedIn=authed();
+  kid = (signedIn && KIDS.find(k=>k.name_key===signedIn.key)) || KIDS[0] || null;
+  renderKidPick();
+  await load();
+}
+function renderKidPick(){
+  const box=document.getElementById("kidPick");
+  if(!KIDS.length){ box.innerHTML='<div class="msg info">No children have signed up yet.</div>'; return }
+  box.innerHTML='<div class="chips">'+KIDS.map(k=>
+    `<button class="chip${kid&&k.name_key===kid.name_key?" on":""}" onclick="pickKid('${k.name_key}')">${k.avatar||"🙂"} ${esc(k.name)}</button>`
+   ).join("")+'</div>';
+}
+async function pickKid(key){
+  kid=KIDS.find(k=>k.name_key===key)||kid;
+  dashFilter="all"; renderKidPick(); await load();
+}
 async function load(){
-  const a=authed();
   const body=document.getElementById("dashBody");
-  if(!a){
-    document.getElementById("dashTitle").textContent="📈 Full Dashboard";
-    document.getElementById("dashSub").textContent="";
-    body.innerHTML=`<div class="msg info">Nobody is logged in on this computer yet.</div>
-      <p class="sub">Open the game, log in with your name and password, and your results will appear here — from any computer.</p>
-      <a class="btn" href="${GAME}">🎮 Open the game</a>`;
-    return;
-  }
-  user=a;
-  document.getElementById("whoName").textContent=a.name;
-  document.getElementById("avEmoji").textContent=a.avatar||"🙂";
-  document.getElementById("dashTitle").textContent=`📈 ${a.name}'s Full Dashboard`;
-  body.innerHTML='<p class="sub">Loading your results…</p>';
-  await flushQueue();
-  const res=await loadSessions(a.key);
+  if(!kid){ body.innerHTML='<div class="msg info">No children have signed up yet. Ask them to create an account in the game.</div>'; return }
+  user={name:kid.name,key:kid.name_key,avatar:kid.avatar};
+  document.getElementById("dashTitle").textContent=`📈 ${kid.name}'s Full Dashboard`;
+  body.innerHTML='<p class="sub">Loading results…</p>';
+  const res=await loadSessions(kid.name_key);
   ALL=res.rows; OFFLINE=res.offline;
   render();
 }
-
+function boot(){
+  const p=parentAuthed();
+  if(p){ parent=p; afterParent(); }
+  else { screen("lock"); pTab("login"); }
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Enter" && !document.getElementById("s-lock").classList.contains("hide")){
+    e.preventDefault(); doParentAuth();
+  }
+});
 function render(){
   const all=ALL, body=document.getElementById("dashBody");
   document.getElementById("dashSub").textContent=all.length?
@@ -348,7 +472,7 @@ function render(){
     "No tests yet — play a quiz and your progress will appear here.";
   if(!all.length){
     body.innerHTML=`<div class="note">Play your first quiz and this page will fill up with your scores, your strongest topics and the ones to work on.</div>
-      <div style="margin-top:16px"><a class="btn" href="${GAME}">Pick a subject ▶</a></div>`;
+      <div style="margin-top:16px"><a class="btn" href="${GAME}">Open the game ▶</a></div>`;
     return;
   }
   const ss=dashFilter==="all"?all:all.filter(s=>s.subj===dashFilter);
@@ -418,7 +542,7 @@ function render(){
     }).join("")}</tbody></table></div>
 
   <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
-    <a class="btn" href="${GAME}">🎮 Practise now</a>
+    <a class="btn" href="${GAME}">🎮 Open the game</a>
     <button class="btn grey" onclick="exportCsv()">⬇️ Export record (CSV)</button>
     <button class="btn grey" onclick="load()">🔄 Refresh</button>
   </div>`;
@@ -432,8 +556,8 @@ function exportCsv(){
   a.href=URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}));
   a.download=`SATs_record_${user.name}.csv`; a.click();
 }
-function logout(){ clearAuth(); location.href=GAME }
-load();
+function logout(){ parentLogout(); parent=null; ALL=[]; document.getElementById("pPass").value=""; screen("lock"); pTab("login") }
+boot();
 </script>
 </body>
 </html>
