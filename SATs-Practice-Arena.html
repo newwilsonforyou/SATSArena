@@ -30,7 +30,7 @@ header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 
   padding:4px 14px 4px 4px;cursor:pointer;font-family:inherit}
 .who:hover{background:rgba(255,255,255,.22)}
 .modal{position:fixed;inset:0;background:rgba(8,10,40,.66);display:grid;place-items:center;z-index:50;padding:16px}
-.modal .card{max-width:440px;width:100%}
+.modal .card{max-width:560px;width:100%;max-height:88vh;overflow:auto}
 .av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:1.1rem;
   background:linear-gradient(135deg,#ffd166,#ff8fab)}
 .card{background:var(--card);border-radius:20px;padding:22px;box-shadow:0 18px 44px rgba(6,8,40,.34)}
@@ -46,7 +46,17 @@ input[type=text]:focus,input[type=password]:focus{outline:none;border-color:#636
 .msg.err{background:#fff0f3;border:2px solid #ffc0cd;color:#a1103a}
 .msg.ok{background:#e7f9ee;border:2px solid #86e0a8;color:#106b34}
 .msg.info{background:#eef6ff;border:2px solid #bcdcff;color:#12447d}
-.avpick{font-size:1.6rem;padding:6px 12px}
+.avsearch{width:100%;padding:11px 14px;border:2px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin-bottom:10px}
+.avsearch:focus{outline:none;border-color:#6366f1}
+.avcats{margin-bottom:10px}
+.avcats .chip{padding:7px 12px;font-size:.85rem}
+.avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px;max-height:270px;
+  overflow:auto;padding:10px;border:2px solid var(--line);border-radius:14px;background:#fafbff}
+.avgrid button{font-size:1.55rem;border:2px solid transparent;background:#fff;border-radius:10px;
+  padding:5px 0;cursor:pointer;line-height:1.25;font-family:inherit;transition:transform .08s}
+.avgrid button:hover{border-color:#c7cbf5;transform:scale(1.18)}
+.avgrid button.on{border-color:#6366f1;background:#eef0ff}
+.avcount{font-size:.8rem;color:var(--muted);margin-top:8px}
 .cloud{font-size:.8rem;color:#cdd2f5;display:flex;align-items:center;gap:6px}
 .dot{width:9px;height:9px;border-radius:50%;background:#22c55e;display:inline-block}
 .dot.off{background:#f59e0b}
@@ -156,8 +166,8 @@ canvas{max-width:100%}
     <label class="lbl" for="inPass">Password</label>
     <input type="password" id="inPass" placeholder="at least 4 characters" autocomplete="current-password">
     <div id="avatarPick" class="hide">
-      <label class="lbl">Pick your avatar</label>
-      <div class="chips" id="avChips"></div>
+      <label class="lbl">Pick your avatar <span id="avPickedNow" style="font-size:1.4rem;vertical-align:-4px"></span></label>
+      <div id="pkSignup"></div>
     </div>
     <div style="margin-top:20px"><button class="btn" id="authGo" onclick="doAuth()">Log in ▶</button></div>
     <div id="authMsg"></div>
@@ -215,8 +225,8 @@ canvas{max-width:100%}
 <div id="avModal" class="modal hide">
   <div class="card">
     <h1>Choose your avatar</h1>
-    <p class="sub">Tap one to change it. It saves to your account straight away.</p>
-    <div class="chips" id="avModalChips"></div>
+    <p class="sub">Search or pick a group, then tap one. It saves straight away.</p>
+    <div id="pkModal"></div>
     <div id="avModalMsg"></div>
     <div style="margin-top:20px;display:flex;gap:10px">
       <button class="btn grey" onclick="closeAvatar()">Close</button>
@@ -274,6 +284,9 @@ const READING_PDF = {
  "2025":"2025_KS2_English_reading_booklet.pdf"
 };
 
+/* ~1,000 child-safe avatars, grouped */
+const AV = {"🌿 Nature":[["🌀","Cyclone"],["🌂","Closed Umbrella"],["🌄","Sunrise Over Mountains"],["🌅","Sunrise"],["🌇","Sunset Over Buildings"],["🌈","Rainbow"],["🌋","Volcano"],["🌌","Milky Way"],["🌍","Earth Globe Europe-Africa"],["🌎","Earth Globe Americas"],["🌏","Earth Globe Asia-Australia"],["🌐","Globe With Meridians"],["🌛","First Quarter Moon With Face"],["🌜","Last Quarter Moon With Face"],["🌝","Full Moon With Face"],["🌞","Sun With Face"],["🌟","Glowing Star"],["🌠","Shooting Star"],["🌧","Cloud With Rain"],["🌨","Cloud With Snow"],["🌩","Cloud With Lightning"],["🌪","Cloud With Tornado"],["🌫","Fog"],["🌬","Wind Blowing Face"],["🌱","Seedling"],["🌲","Evergreen Tree"],["🌳","Deciduous Tree"],["🌴","Palm Tree"],["🌵","Cactus"],["🌷","Tulip"],["🌸","Cherry Blossom"],["🌹","Rose"],["🌺","Hibiscus"],["🌻","Sunflower"],["🌼","Blossom"],["🌿","Herb"],["🍀","Four Leaf Clover"],["🍁","Maple Leaf"],["🍂","Fallen Leaf"],["🍃","Leaf Fluttering In Wind"],["🎄","Christmas Tree"],["🎇","Firework Sparkler"],["🎋","Tanabata Tree"],["🎐","Wind Chime"],["🎑","Moon Viewing Ceremony"],["🎕","Bouquet Of Flowers"],["🏔","Snow Capped Mountain"],["🏖","Beach With Umbrella"],["🏜","Desert"],["🏝","Desert Island"],["💐","Bouquet"],["💧","Droplet"],["🔉","Speaker With One Sound Wave"],["🔥","Fire"],["🔭","Telescope"],["🕓","Clock Face Four Oclock"],["🖄","Envelope With Lightning"],["🗱","Lightning Mood Bubble"],["🗲","Lightning Mood"],["🚒","Fire Engine"],["🚞","Mountain Railway"],["🚠","Mountain Cableway"],["🚵","Mountain Bicyclist"],["🛱","Oncoming Fire Engine"],["🤦","Face Palm"],["🤩","Grinning Face With Star Eyes"],["🥮","Moon Cake"],["🧘","Person In Lotus Position"],["🧯","Fire Extinguisher"],["🪐","Ringed Planet"],["🪨","Rock"],["🪴","Potted Plant"],["🪵","Wood"],["☁","Cloud"],["☂","Umbrella"],["☃","Snowman"],["☄","Comet"],["☇","Lightning"],["☉","Sun"],["☔","Umbrella With Rain Drops"],["☘","Shamrock"],["☲","Trigram For Fire"],["☳","Trigram For Thunder"],["☴","Trigram For Wind"],["☶","Trigram For Mountain"],["☷","Trigram For Earth"],["☽","First Quarter Moon"],["☾","Last Quarter Moon"],["♁","Earth"],["♩","Quarter Note"],["⛄","Snowman Without Snow"],["⛅","Sun Behind Cloud"],["⛆","Rain"],["⛈","Thunder Cloud And Rain"],["⛰","Mountain"],["⛱","Umbrella On Ground"],["✢","Four Teardrop-Spoked Asterisk"],["✣","Four Balloon-Spoked Asterisk"],["✥","Four Club-Spoked Asterisk"],["✨","Sparkles"],["✯","Pinwheel Star"],["❄","Snowflake"],["❅","Tight Trifoliate Snowflake"]],"🍎 Food":[["🌭","Hot Dog"],["🌮","Taco"],["🌯","Burrito"],["🌰","Chestnut"],["🌶","Hot Pepper"],["🌽","Ear Of Maize"],["🌾","Ear Of Rice"],["🍄","Mushroom"],["🍅","Tomato"],["🍆","Aubergine"],["🍇","Grapes"],["🍈","Melon"],["🍉","Watermelon"],["🍊","Tangerine"],["🍋","Lemon"],["🍌","Banana"],["🍍","Pineapple"],["🍎","Red Apple"],["🍏","Green Apple"],["🍐","Pear"],["🍑","Peach"],["🍒","Cherries"],["🍓","Strawberry"],["🍔","Hamburger"],["🍕","Slice Of Pizza"],["🍖","Meat On Bone"],["🍗","Poultry Leg"],["🍘","Rice Cracker"],["🍙","Rice Ball"],["🍚","Cooked Rice"],["🍛","Curry And Rice"],["🍜","Steaming Bowl"],["🍝","Spaghetti"],["🍞","Bread"],["🍟","French Fries"],["🍠","Roasted Sweet Potato"],["🍡","Dango"],["🍢","Oden"],["🍣","Sushi"],["🍥","Fish Cake With Swirl Design"],["🍦","Soft Ice Cream"],["🍧","Shaved Ice"],["🍨","Ice Cream"],["🍩","Doughnut"],["🍪","Cookie"],["🍫","Chocolate Bar"],["🍬","Candy"],["🍭","Lollipop"],["🍮","Custard"],["🍯","Honey Pot"],["🍰","Shortcake"],["🍱","Bento Box"],["🍳","Cooking"],["🍵","Teacup Without Handle"],["🍹","Tropical Drink"],["🍿","Popcorn"],["🎂","Birthday Cake"],["🏒","Ice Hockey Stick And Puck"],["🕏","Bowl Of Hygieia"],["🖬","Soft Shell Floppy Disk"],["🥄","Spoon"],["🥐","Croissant"],["🥑","Avocado"],["🥒","Cucumber"],["🥓","Bacon"],["🥔","Potato"],["🥕","Carrot"],["🥖","Baguette Bread"],["🥗","Green Salad"],["🥙","Stuffed Flatbread"],["🥚","Egg"],["🥛","Glass Of Milk"],["🥜","Peanuts"],["🥝","Kiwifruit"],["🥞","Pancakes"],["🥟","Dumpling"],["🥠","Fortune Cookie"],["🥢","Chopsticks"],["🥣","Bowl With Spoon"],["🥤","Cup With Straw"],["🥥","Coconut"],["🥦","Broccoli"],["🥧","Pie"],["🥨","Pretzel"],["🥩","Cut Of Meat"],["🥪","Sandwich"],["🥭","Mango"],["🥯","Bagel"],["🦪","Oyster"],["🧀","Cheese Wedge"],["🧁","Cupcake"],["🧂","Salt Shaker"],["🧄","Garlic"],["🧅","Onion"],["🧆","Falafel"],["🧇","Waffle"],["🧈","Butter"],["🧉","Mate Drink"],["🧊","Ice Cube"],["🫐","Blueberries"],["🫑","Bell Pepper"],["🫒","Olive"],["🫓","Flatbread"],["🫔","Tamale"],["🫖","Teapot"],["☕","Hot Beverage"],["♨","Hot Springs"],["⛸","Ice Skate"]],"🐾 Animals":[["🍤","Fried Shrimp"],["🎠","Carousel Horse"],["🎣","Fishing Pole And Fish"],["🏇","Horse Racing"],["🏏","Cricket Bat And Ball"],["🐀","Rat"],["🐁","Mouse"],["🐂","Ox"],["🐄","Cow"],["🐅","Tiger"],["🐆","Leopard"],["🐇","Rabbit"],["🐈","Cat"],["🐉","Dragon"],["🐊","Crocodile"],["🐋","Whale"],["🐌","Snail"],["🐍","Snake"],["🐎","Horse"],["🐏","Ram"],["🐐","Goat"],["🐒","Monkey"],["🐓","Rooster"],["🐕","Dog"],["🐖","Pig"],["🐗","Boar"],["🐘","Elephant"],["🐙","Octopus"],["🐚","Spiral Shell"],["🐛","Bug"],["🐜","Ant"],["🐞","Lady Beetle"],["🐟","Fish"],["🐠","Tropical Fish"],["🐡","Blowfish"],["🐢","Turtle"],["🐣","Hatching Chick"],["🐦","Bird"],["🐧","Penguin"],["🐨","Koala"],["🐩","Poodle"],["🐪","Dromedary Camel"],["🐫","Bactrian Camel"],["🐬","Dolphin"],["🐭","Mouse Face"],["🐮","Cow Face"],["🐯","Tiger Face"],["🐰","Rabbit Face"],["🐱","Cat Face"],["🐲","Dragon Face"],["🐳","Spouting Whale"],["🐴","Horse Face"],["🐵","Monkey Face"],["🐶","Dog Face"],["🐷","Pig Face"],["🐸","Frog Face"],["🐹","Hamster Face"],["🐺","Wolf Face"],["🐻","Bear Face"],["🐼","Panda Face"],["🐽","Pig Nose"],["🐾","Paw Prints"],["🐿","Chipmunk"],["🕷","Spider"],["🕸","Spider Web"],["🖦","Keyboard And Mouse"],["😸","Grinning Cat Face With Smiling Eyes"],["😹","Cat Face With Tears Of Joy"],["😺","Smiling Cat Face With Open Mouth"],["😻","Smiling Cat Face With Heart-Shaped Eyes"],["😼","Cat Face With Wry Smile"],["😽","Kissing Cat Face With Closed Eyes"],["😾","Pouting Cat Face"],["😿","Crying Cat Face"],["🙈","See-No-Evil Monkey"],["🙉","Hear-No-Evil Monkey"],["🙊","Speak-No-Evil Monkey"],["🦀","Crab"],["🦁","Lion Face"],["🦂","Scorpion"],["🦃","Turkey"],["🦄","Unicorn Face"],["🦅","Eagle"],["🦆","Duck"],["🦇","Bat"],["🦈","Shark"],["🦉","Owl"],["🦊","Fox Face"],["🦋","Butterfly"],["🦌","Deer"],["🦍","Gorilla"],["🦎","Lizard"],["🦏","Rhinoceros"],["🦐","Shrimp"],["🦑","Squid"],["🦒","Giraffe Face"],["🦓","Zebra Face"],["🦔","Hedgehog"],["🦕","Sauropod"],["🦖","T-Rex"],["🦗","Cricket"],["🦘","Kangaroo"],["🦙","Llama"],["🦚","Peacock"],["🦛","Hippopotamus"],["🦜","Parrot"],["🦝","Raccoon"],["🦞","Lobster"],["🦟","Mosquito"],["🦠","Microbe"],["🦡","Badger"],["🦢","Swan"],["🦣","Mammoth"],["🦤","Dodo"],["🦦","Otter"],["🦨","Skunk"],["🦩","Flamingo"],["🦫","Beaver"],["🦬","Bison"],["🦭","Seal"],["🦮","Guide Dog"],["🧸","Teddy Bear"],["🪤","Mouse Trap"],["🪰","Fly"],["🪱","Worm"],["🪲","Beetle"],["🪳","Cockroach"],["🪶","Feather"]],"⚽ Sport & Games":[["🎈","Balloon"],["🎉","Party Popper"],["🎊","Confetti Ball"],["🎪","Circus Tent"],["🎫","Ticket"],["🎮","Video Game"],["🎱","Billiards"],["🎲","Game Die"],["🎳","Bowling"],["🎾","Tennis Racquet And Ball"],["🎿","Ski And Ski Boot"],["🏀","Basketball And Hoop"],["🏂","Snowboarder"],["🏃","Runner"],["🏄","Surfer"],["🏅","Sports Medal"],["🏆","Trophy"],["🏈","American Football"],["🏉","Rugby Football"],["🏊","Swimmer"],["🏐","Volleyball"],["🏑","Field Hockey Stick And Ball"],["🏓","Table Tennis Paddle And Ball"],["🏵","Rosette"],["🏸","Badminton Racquet And Shuttlecock"],["💭","Thought Balloon"],["💿","Optical Disc"],["📹","Video Camera"],["🕹","Joystick"],["🖸","Optical Disc Icon"],["🚣","Rowboat"],["🚲","Bicycle"],["🛷","Sled"],["🛼","Roller Skate"],["🤸","Person Doing Cartwheel"],["🤹","Juggling"],["🤿","Diving Mask"],["🥅","Goal Net"],["🥇","First Place Medal"],["🥈","Second Place Medal"],["🥉","Third Place Medal"],["🥌","Curling Stone"],["🥍","Lacrosse Stick And Ball"],["🥎","Softball"],["🥏","Flying Disc"],["🥳","Face With Party Horn And Party Hat"],["🧗","Person Climbing"],["🧩","Jigsaw Puzzle Piece"],["🪀","Yo-Yo"],["🪁","Kite"],["🪃","Boomerang"],["🪄","Magic Wand"],["🪅","Pinata"],["🪆","Nesting Dolls"],["🪞","Mirror"],["🪢","Knot"],["⚀","Die Face-1"],["⚁","Die Face-2"],["⚂","Die Face-3"],["⚃","Die Face-4"],["⚄","Die Face-5"],["⚅","Die Face-6"],["⚽","Soccer Ball"],["⚾","Baseball"]],"🚀 Travel & Space":[["🌆","Cityscape At Dusk"],["🌉","Bridge At Night"],["🎒","School Satchel"],["🎡","Ferris Wheel"],["🎢","Roller Coaster"],["🏍","Racing Motorcycle"],["🏎","Racing Car"],["🏕","Camping"],["🏗","Building Construction"],["🏘","House Buildings"],["🏙","Cityscape"],["🏚","Derelict House Building"],["🏛","Classical Building"],["🏟","Stadium"],["🏠","House Building"],["🏡","House With Garden"],["🏢","Office Building"],["🏤","European Post Office"],["🏦","Bank"],["🏨","Hotel"],["🏩","Love Hotel"],["🏪","Convenience Store"],["🏫","School"],["🏬","Department Store"],["🏭","Factory"],["🏰","European Castle"],["💒","Wedding"],["💺","Seat"],["📡","Satellite Antenna"],["🗺","World Map"],["🗻","Mount Fuji"],["🗼","Tokyo Tower"],["🗽","Statue Of Liberty"],["🚀","Rocket"],["🚁","Helicopter"],["🚂","Steam Locomotive"],["🚃","Railway Car"],["🚄","High-Speed Train"],["🚆","Train"],["🚇","Metro"],["🚉","Station"],["🚊","Tram"],["🚋","Tram Car"],["🚌","Bus"],["🚍","Oncoming Bus"],["🚎","Trolleybus"],["🚕","Taxi"],["🚖","Oncoming Taxi"],["🚚","Delivery Truck"],["🚜","Tractor"],["🚝","Monorail"],["🚟","Suspension Railway"],["🚡","Aerial Tramway"],["🚢","Ship"],["🚤","Speedboat"],["🚥","Horizontal Traffic Light"],["🚦","Vertical Traffic Light"],["🛖","Hut"],["🛣","Motorway"],["🛤","Railway Track"],["🛥","Motor Boat"],["🛧","Up-Pointing Airplane"],["🛪","Northeast-Pointing Airplane"],["🛫","Airplane Departure"],["🛬","Airplane Arriving"],["🛰","Satellite"],["🛲","Diesel Locomotive"],["🛳","Passenger Ship"],["🛴","Scooter"],["🛵","Motor Scooter"],["🛶","Canoe"],["🛸","Flying Saucer"],["🛻","Pickup Truck"],["🧭","Compass"],["🧳","Luggage"],["🪂","Parachute"],["⚓","Anchor"],["⛍","Disabled Car"],["⛐","Car Sliding"],["⛫","Castle"],["⛲","Fountain"],["⛴","Ferry"],["⛵","Sailboat"],["⛺","Tent"],["⛽","Fuel Pump"],["✈","Airplane"]],"🎵 Music & Art":[["🎘","Musical Keyboard With Jacks"],["🎙","Studio Microphone"],["🎚","Level Slider"],["🎜","Beamed Ascending Musical Notes"],["🎝","Beamed Descending Musical Notes"],["🎞","Film Frames"],["🎤","Microphone"],["🎥","Movie Camera"],["🎧","Headphone"],["🎨","Artist Palette"],["🎬","Clapper Board"],["🎭","Performing Arts"],["🎵","Musical Note"],["🎶","Multiple Musical Notes"],["🎷","Saxophone"],["🎸","Guitar"],["🎹","Musical Keyboard"],["🎺","Trumpet"],["🎻","Violin"],["🎼","Musical Score"],["👒","Womans Hat"],["📣","Cheering Megaphone"],["📯","Postal Horn"],["📷","Camera"],["📸","Camera With Flash"],["📺","Television"],["📻","Radio"],["📽","Film Projector"],["🔈","Speaker"],["🔊","Speaker With Three Sound Waves"],["🔔","Bell"],["🕫","Bullhorn"],["🕬","Bullhorn With Sound Waves"],["🕭","Ringing Bell"],["🖮","Wired Keyboard"],["🗅","Empty Note"],["🗆","Empty Note Page"],["🗇","Empty Note Pad"],["🗈","Note"],["🗉","Note Page"],["🗊","Note Pad"],["🗒","Spiral Note Pad"],["😷","Face With Medical Mask"],["🛎","Bellhop Bell"],["🤠","Face With Cowboy Hat"],["🥁","Drum With Drumsticks"],["🧵","Spool Of Thread"],["🧶","Ball Of Yarn"],["🩰","Ballet Shoes"],["🪕","Banjo"],["🪗","Accordion"],["🪘","Long Drum"],["🪡","Sewing Needle"],["♪","Eighth Note"],["♫","Beamed Eighth Notes"],["♬","Beamed Sixteenth Notes"]],"🎒 School & Things":[["🎀","Ribbon"],["🎁","Wrapped Present"],["🎓","Graduation Cap"],["🎗","Reminder Ribbon"],["🎽","Running Shirt With Sash"],["🏷","Label"],["🏺","Amphora"],["👑","Crown"],["👔","Necktie"],["👖","Jeans"],["👗","Dress"],["👘","Kimono"],["👛","Purse"],["👜","Handbag"],["👝","Pouch"],["👞","Mans Shoe"],["👟","Athletic Shoe"],["👠","High-Heeled Shoe"],["👡","Womans Sandal"],["💍","Ring"],["💎","Gem Stone"],["💝","Heart With Ribbon"],["💡","Electric Light Bulb"],["💹","Chart With Upwards Trend And Yen Sign"],["💻","Personal Computer"],["💼","Briefcase"],["💽","Minidisc"],["💾","Floppy Disk"],["📀","Dvd"],["📁","File Folder"],["📂","Open File Folder"],["📃","Page With Curl"],["📅","Calendar"],["📆","Tear-Off Calendar"],["📇","Card Index"],["📈","Chart With Upwards Trend"],["📉","Chart With Downwards Trend"],["📊","Bar Chart"],["📋","Clipboard"],["📌","Pushpin"],["📍","Round Pushpin"],["📎","Paperclip"],["📏","Straight Ruler"],["📐","Triangular Ruler"],["📑","Bookmark Tabs"],["📒","Ledger"],["📓","Notebook"],["📔","Notebook With Decorative Cover"],["📕","Closed Book"],["📖","Open Book"],["📗","Green Book"],["📘","Blue Book"],["📙","Orange Book"],["📚","Books"],["📜","Scroll"],["📝","Memo"],["📞","Telephone Receiver"],["📟","Pager"],["📠","Fax Machine"],["📤","Outbox Tray"],["📥","Inbox Tray"],["📦","Package"],["📨","Incoming Envelope"],["📰","Newspaper"],["🔋","Battery"],["🔌","Electric Plug"],["🔏","Lock With Ink Pen"],["🔐","Closed Lock With Key"],["🔑","Key"],["🔒","Lock"],["🔓","Open Lock"],["🔖","Bookmark"],["🔧","Wrench"],["🔨","Hammer"],["🔩","Nut And Bolt"],["🔬","Microscope"],["🕐","Clock Face One Oclock"],["🕑","Clock Face Two Oclock"],["🕒","Clock Face Three Oclock"],["🕔","Clock Face Five Oclock"],["🕕","Clock Face Six Oclock"],["🕖","Clock Face Seven Oclock"],["🕗","Clock Face Eight Oclock"],["🕘","Clock Face Nine Oclock"],["🕙","Clock Face Ten Oclock"],["🕚","Clock Face Eleven Oclock"],["🕛","Clock Face Twelve Oclock"],["🕜","Clock Face One-Thirty"],["🕝","Clock Face Two-Thirty"],["🕞","Clock Face Three-Thirty"],["🕟","Clock Face Four-Thirty"],["🕠","Clock Face Five-Thirty"],["🕡","Clock Face Six-Thirty"],["🕢","Clock Face Seven-Thirty"],["🕣","Clock Face Eight-Thirty"],["🕤","Clock Face Nine-Thirty"],["🕥","Clock Face Ten-Thirty"],["🕦","Clock Face Eleven-Thirty"],["🕧","Clock Face Twelve-Thirty"],["🕮","Book"],["🕯","Candle"],["🕰","Mantelpiece Clock"],["🕼","Telephone Receiver With Page"],["🖃","Stamped Envelope"],["🖅","Flying Envelope"],["🖆","Pen Over Stamped Envelope"],["🖥","Desktop Computer"],["🖨","Printer"],["🖲","Trackball"],["🖳","Old Personal Computer"],["🖶","Printer Icon"],["🖷","Fax Icon"],["🗀","Folder"],["🗁","Open Folder"],["🗂","Card Index Dividers"],["🗃","Card File Box"],["🗄","File Cabinet"],["🗌","Empty Page"],["🗏","Page"],["🗓","Spiral Calendar Pad"],["🗝","Old Key"],["🗞","Rolled-Up Newspaper"],["🗠","Stock Chart"],["🗳","Ballot Box With Ballot"],["🗴","Ballot Script X"],["🗵","Ballot Box With Script X"],["🗶","Ballot Bold Script X"],["🗷","Ballot Box With Bold Script X"],["🗹","Ballot Box With Bold Check"],["🚪","Door"],["🛋","Couch And Lamp"],["🛍","Shopping Bags"],["🛏","Bed"],["🛒","Shopping Trolley"],["🛠","Hammer And Wrench"],["🤈","Downward Facing Hook"],["🤊","Downward Facing Hook With Dot"],["🥼","Lab Coat"],["🥽","Goggles"],["🥾","Hiking Boot"],["🥿","Flat Shoe"],["🦺","Safety Vest"],["🧣","Scarf"],["🧤","Gloves"],["🧥","Coat"],["🧦","Socks"],["🧧","Red Gift Envelope"],["🧪","Test Tube"],["🧫","Petri Dish"],["🧬","Dna Double Helix"],["🧮","Abacus"],["🧰","Toolbox"],["🧱","Brick"],["🧲","Magnet"],["🧴","Lotion Bottle"],["🧷","Safety Pin"],["🧹","Broom"],["🧺","Basket"],["🧼","Bar Of Soap"],["🧽","Sponge"],["🩴","Thong Sandal"],["🩺","Stethoscope"],["🪑","Chair"],["🪒","Razor"],["🪔","Diya Lamp"],["🪙","Coin"],["🪚","Carpentry Saw"],["🪛","Screwdriver"],["🪜","Ladder"],["🪝","Hook"],["🪠","Plunger"],["🪣","Bucket"],["🪥","Toothbrush"],["☐","Ballot Box"],["☑","Ballot Box With Check"],["☒","Ballot Box With X"],["☭","Hammer And Sickle"],["⚒","Hammer And Pick"],["⚙","Gear"],["⛓","Chains"],["⛭","Gear Without Hub"],["⛮","Gear With Handles"],["✆","Telephone Location Sign"],["✉","Envelope"],["✏","Pencil"]],"💗 Hearts & Time":[["👬","Two Men Holding Hands"],["👭","Two Women Holding Hands"],["💓","Beating Heart"],["💔","Broken Heart"],["💕","Two Hearts"],["💖","Sparkling Heart"],["💗","Growing Heart"],["💙","Blue Heart"],["💚","Green Heart"],["💛","Yellow Heart"],["💜","Purple Heart"],["💞","Revolving Hearts"],["💟","Heart Decoration"],["🤎","Brown Heart"],["🥰","Smiling Face With Smiling Eyes And Three Hearts"],["🧡","Orange Heart"],["🫀","Anatomical Heart"],["❦","Floral Heart"]],"😀 Faces & Fun":[["🎃","Jack-O-Lantern"],["👀","Eyes"],["👁","Eye"],["👊","Fisted Hand Sign"],["👏","Clapping Hands Sign"],["👦","Boy"],["👧","Girl"],["👨","Man"],["👩","Woman"],["👫","Man And Woman Holding Hands"],["👯","Woman With Bunny Ears"],["👱","Person With Blond Hair"],["👲","Man With Gua Pi Mao"],["👳","Man With Turban"],["👴","Older Man"],["👵","Older Woman"],["👷","Construction Worker"],["👸","Princess"],["👻","Ghost"],["👽","Extraterrestrial Alien"],["👾","Alien Monster"],["💁","Information Desk Person"],["💃","Dancer"],["💅","Nail Polish"],["💆","Face Massage"],["💪","Flexed Biceps"],["🕴","Man In Business Suit Levitating"],["🕺","Man Dancing"],["🖐","Raised Hand With Fingers Splayed"],["🖑","Reversed Raised Hand With Fingers Splayed"],["🖔","Reversed Victory Hand"],["🗸","Light Check Mark"],["😀","Grinning Face"],["😁","Grinning Face With Smiling Eyes"],["😂","Face With Tears Of Joy"],["😃","Smiling Face With Open Mouth"],["😄","Smiling Face With Open Mouth And Smiling Eyes"],["😅","Smiling Face With Open Mouth And Cold Sweat"],["😆","Smiling Face With Open Mouth And Tightly-Closed Eyes"],["😇","Smiling Face With Halo"],["😉","Winking Face"],["😊","Smiling Face With Smiling Eyes"],["😋","Face Savouring Delicious Food"],["😌","Relieved Face"],["😍","Smiling Face With Heart-Shaped Eyes"],["😎","Smiling Face With Sunglasses"],["😏","Smirking Face"],["😐","Neutral Face"],["😑","Expressionless Face"],["😒","Unamused Face"],["😓","Face With Cold Sweat"],["😔","Pensive Face"],["😕","Confused Face"],["😖","Confounded Face"],["😗","Kissing Face"],["😙","Kissing Face With Smiling Eyes"],["😚","Kissing Face With Closed Eyes"],["😛","Face With Stuck-Out Tongue"],["😜","Face With Stuck-Out Tongue And Winking Eye"],["😝","Face With Stuck-Out Tongue And Tightly-Closed Eyes"],["😞","Disappointed Face"],["😟","Worried Face"],["😡","Pouting Face"],["😢","Crying Face"],["😤","Face With Look Of Triumph"],["😥","Disappointed But Relieved Face"],["😦","Frowning Face With Open Mouth"],["😧","Anguished Face"],["😨","Fearful Face"],["😬","Grimacing Face"],["😭","Loudly Crying Face"],["😮","Face With Open Mouth"],["😯","Hushed Face"],["😰","Face With Open Mouth And Cold Sweat"],["😱","Face Screaming In Fear"],["😲","Astonished Face"],["😳","Flushed Face"],["😴","Sleeping Face"],["😵","Dizzy Face"],["😶","Face Without Mouth"],["🙁","Slightly Frowning Face"],["🙂","Slightly Smiling Face"],["🙃","Upside-Down Face"],["🙄","Face With Rolling Eyes"],["🙅","Face With No Good Gesture"],["🙇","Person Bowing Deeply"],["🙋","Happy Person Raising One Hand"],["🙌","Person Raising Both Hands In Celebration"],["🙍","Person Frowning"],["🙎","Person With Pouting Face"],["🙏","Person With Folded Hands"],["🚧","Construction Sign"],["🛌","Sleeping Accommodation"],["🤌","Pinched Fingers"],["🤏","Pinching Hand"],["🤐","Zipper-Mouth Face"],["🤒","Face With Thermometer"],["🤓","Nerd Face"],["🤔","Thinking Face"],["🤕","Face With Head-Bandage"],["🤖","Robot Face"],["🤗","Hugging Face"],["🤙","Call Me Hand"],["🤛","Left-Facing Fist"],["🤜","Right-Facing Fist"],["🤝","Handshake"],["🤟","I Love You Hand Sign"],["🤡","Clown Face"],["🤥","Lying Face"],["🤧","Sneezing Face"],["🤨","Face With One Eyebrow Raised"],["🤫","Face With Finger Covering Closed Lips"],["🤭","Smiling Face With Smiling Eyes And Hand Covering Mouth"],["🤯","Shocked Face With Exploding Head"],["🤳","Selfie"],["🤴","Prince"],["🤵","Man In Tuxedo"],["🥱","Yawning Face"],["🥲","Smiling Face With Tear"],["🥴","Face With Uneven Eyes And Wavy Mouth"],["🥵","Overheated Face"],["🥶","Freezing Face"],["🥷","Ninja"],["🥸","Disguised Face"],["🥺","Face With Pleading Eyes"],["🦵","Leg"],["🦶","Foot"],["🦷","Tooth"],["🦸","Superhero"],["🦿","Mechanical Leg"],["🧍","Standing Person"],["🧎","Kneeling Person"],["🧏","Deaf Person"],["🧐","Face With Monocle"],["🧑","Adult"],["🧒","Child"],["🧓","Older Adult"],["🧔","Bearded Person"],["🧕","Person With Headscarf"],["🧖","Person In Steamy Room"],["🧙","Mage"],["🧚","Fairy"],["🧛","Vampire"],["🧜","Merperson"],["🧝","Elf"],["🧞","Genie"],["🧟","Zombie"],["🧠","Brain"],["🫂","People Hugging"],["⛹","Person With Ball"],["✊","Raised Fist"],["✋","Raised Hand"],["✌","Victory Hand"],["✍","Writing Hand"],["✓","Check Mark"]],"✨ More fun":[["🌁","Foggy"],["🌃","Night With Stars"],["🌡","Thermometer"],["🍲","Pot Of Food"],["🎅","Father Christmas"],["🎆","Fireworks"],["🎌","Crossed Flags"],["🎍","Pine Decoration"],["🎏","Carp Streamer"],["🎦","Cinema"],["🎯","Direct Hit"],["🏋","Weight Lifter"],["🏌","Golfer"],["🏮","Izakaya Lantern"],["🐑","Sheep"],["🐔","Chicken"],["🐝","Honeybee"],["👅","Tongue"],["👓","Eyeglasses"],["👕","T-Shirt"],["👚","Womans Clothes"],["👢","Womans Boots"],["👪","Family"],["💂","Guardsman"],["💇","Haircut"],["💌","Love Letter"],["💰","Money Bag"],["💸","Money With Wings"],["📢","Public Address Loudspeaker"],["📮","Postbox"],["📳","Vibration Mode"],["📼","Videocassette"],["📾","Portable Stereo"],["🔍","Left-Pointing Magnifying Glass"],["🔎","Right-Pointing Magnifying Glass"],["🔦","Electric Torch"],["🔮","Crystal Ball"],["🕊","Dove Of Peace"],["🕳","Hole"],["🕶","Dark Sunglasses"],["🖇","Linked Paperclips"],["🖧","Three Networked Computers"],["🖭","Tape Cartridge"],["🖴","Hard Disk"],["🗍","Empty Pages"],["🗐","Pages"],["🗑","Wastebasket"],["🗗","Overlap"],["🗜","Compression"],["🗢","Lips"],["🗤","Three Rays Above"],["🗥","Three Rays Below"],["🗰","Mood Bubble"],["🗿","Moyai"],["🚈","Light Rail"],["🚐","Minibus"],["🚗","Automobile"],["🚘","Oncoming Automobile"],["🚙","Recreational Vehicle"],["🚴","Bicyclist"],["🚶","Pedestrian"],["🛓","Stupa"],["🛔","Pagoda"],["🛹","Skateboard"],["🤣","Rolling On The Floor Laughing"],["🤶","Mother Christmas"],["🤷","Shrug"],["🤺","Fencer"],["🤻","Modern Pentathlon"],["🤼","Wrestlers"],["🤾","Handball"],["🥘","Shallow Pan Of Food"],["🥡","Takeout Box"],["🥫","Canned Food"],["🥬","Leafy Green"],["🦧","Orangutan"],["🦴","Bone"],["🧋","Bubble Tea"],["🫕","Fondue"],["☈","Thunderstorm"],["⚖","Scales"],["⚹","Sextile"],["⛏","Pick"],["⛬","Historic Site"],["⛷","Skier"],["✇","Tape Drive"],["❇","Sparkle"],["❘","Light Vertical Bar"]]};
+const AV_FLAT = Object.entries(AV).flatMap(([c,list])=>list.map(x=>[x[0],x[1],c]));
 
 /* ==================== SHARED CLOUD BACKEND ====================
    Same Supabase project as the arcade, but its own tables:
@@ -519,12 +532,10 @@ async function aiMark(q,given){
 }
 
 /* ==================== AUTH UI ==================== */
-const AVATARS=["🦊","🐼","🦉","🐙","🦁","🐢","🦄","🐝","🐨","🦕","🐬","🐧","🐸","🐳","🦋","🐝",
- "🐯","🐰","🐻","🐮","🐷","🐵","🦜","🦈","🐴","🐺","🦔","🐲","⭐","🚀","⚽","🎸"];
 let user=null;      // {name,key,avatar,hash}
 let MY=[];          // this child's completed tests (oldest first)
 let CLOUD_OK=true;  // did the last cloud read work?
-let authMode="login", pickedAvatar=AVATARS[0], busy=false;
+let authMode="login", pickedAvatar="🦊", busy=false;
 
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
 function msg(kind,text){ document.getElementById("authMsg").innerHTML=`<div class="msg ${kind}">${text}</div>` }
@@ -537,10 +548,10 @@ function authTab(m){
   document.getElementById("authGo").textContent=m==="login"?"Log in ▶":"Create my account ▶";
   document.getElementById("inPass").setAttribute("autocomplete",m==="login"?"current-password":"new-password");
   document.getElementById("authMsg").innerHTML="";
-  if(m==="new") document.getElementById("avChips").innerHTML=
-    AVATARS.map((a,i)=>`<button class="chip avpick${i===AVATARS.indexOf(pickedAvatar)?" on":""}" onclick="pickAv('${a}',this)">${a}</button>`).join("");
+  if(m==="new") mountPicker("pkSignup",pickedAvatar,a=>{
+    pickedAvatar=a; document.getElementById("avPickedNow").textContent=a;
+  });
 }
-function pickAv(a,el){ pickedAvatar=a; [...el.parentNode.children].forEach(c=>c.classList.remove("on")); el.classList.add("on") }
 
 async function doAuth(){
   if(busy) return; busy=true;
@@ -687,24 +698,68 @@ function renderDash(){
 /* ==================== AVATAR PICKER ==================== */
 function openAvatar(){
   if(!user) return;
-  document.getElementById("avModalChips").innerHTML=AVATARS.map(x=>
-    `<button class="chip avpick${x===user.avatar?" on":""}" onclick="chooseAvatar('${x}',this)">${x}</button>`).join("");
   document.getElementById("avModalMsg").innerHTML="";
   document.getElementById("avModal").classList.remove("hide");
+  mountPicker("pkModal",user.avatar,chooseAvatar);
 }
 function closeAvatar(){ document.getElementById("avModal").classList.add("hide") }
-async function chooseAvatar(a,el){
-  [...el.parentNode.children].forEach(c=>c.classList.remove("on")); el.classList.add("on");
+async function chooseAvatar(a){
   const box=document.getElementById("avModalMsg");
+  box.innerHTML='<div class="msg info">Saving '+a+'…</div>';
   try{
     await updateAvatar(user.key,a);
     user.avatar=a;
     document.getElementById("avEmoji").textContent=a;
-    box.innerHTML='<div class="msg ok">Saved! ' + a + '</div>';
-    setTimeout(closeAvatar,700);
+    box.innerHTML='<div class="msg ok">Saved! '+a+'</div>';
+    setTimeout(closeAvatar,650);
   }catch(e){
     box.innerHTML='<div class="msg err">Could not save right now — check your internet and try again.</div>';
   }
+}
+
+/* ==================== AVATAR PICKER (search + groups, ~1,000 choices) ==================== */
+const PK={};                       // per-host state
+const AV_CATS=Object.keys(AV);
+function mountPicker(host,current,onPick){
+  PK[host]={cat:AV_CATS[0],q:"",sel:current,onPick:onPick};
+  const el=document.getElementById(host);
+  el.innerHTML=`
+    <input type="text" class="avsearch" id="${host}_q" autocomplete="off"
+           placeholder="Search… try dragon, pizza, rocket, football"
+           oninput="pkSearch('${host}',this.value)">
+    <div class="chips avcats" id="${host}_cats"></div>
+    <div class="avgrid" id="${host}_grid"></div>
+    <div class="avcount" id="${host}_count"></div>`;
+  pkCats(host); pkGrid(host);
+}
+function pkCats(host){
+  const s=PK[host];
+  document.getElementById(host+"_cats").innerHTML=AV_CATS.map(c=>
+    `<button class="chip${!s.q&&s.cat===c?" on":""}" onclick="pkCat('${host}','${c}')">${c}</button>`).join("");
+}
+function pkCat(host,c){ const s=PK[host]; s.cat=c; s.q=""; 
+  const q=document.getElementById(host+"_q"); if(q) q.value="";
+  pkCats(host); pkGrid(host); }
+function pkSearch(host,v){ const s=PK[host]; s.q=v.trim().toLowerCase(); pkCats(host); pkGrid(host); }
+function pkList(host){
+  const s=PK[host];
+  if(s.q) return AV_FLAT.filter(x=>x[1].toLowerCase().includes(s.q)).slice(0,300);
+  return (AV[s.cat]||[]).map(x=>[x[0],x[1],s.cat]);
+}
+function pkGrid(host){
+  const s=PK[host], list=pkList(host);
+  document.getElementById(host+"_grid").innerHTML = list.length
+    ? list.map(x=>`<button class="${x[0]===s.sel?"on":""}" title="${esc(x[1])}" onclick="pkChoose('${host}','${x[0]}')">${x[0]}</button>`).join("")
+    : '<div style="grid-column:1/-1;color:#6b7194;padding:10px">Nothing matched — try another word.</div>';
+  document.getElementById(host+"_count").textContent =
+    s.q ? `${list.length} match${list.length===1?"":"es"} for “${s.q}”` : `${list.length} in ${s.cat} · ${AV_FLAT.length} altogether`;
+}
+function pkChoose(host,a){
+  const s=PK[host]; s.sel=a;
+  [...document.getElementById(host+"_grid").children].forEach(b=>b.classList.remove("on"));
+  const hit=[...document.getElementById(host+"_grid").children].find(b=>b.textContent===a);
+  if(hit) hit.classList.add("on");
+  if(s.onPick) s.onPick(a);
 }
 
 /* ==================== SETUP ==================== */
