@@ -377,38 +377,25 @@ function L(){ try{return JSON.parse(localStorage.getItem(LKEY))||{}}catch(e){ret
 function Lsave(o){ localStorage.setItem(LKEY,JSON.stringify(o)) }
 function authed(){ const l=L(); return l.auth&&l.auth.name?l.auth:null }
 function setAuth(a){ const l=L(); l.auth=a; Lsave(l) }
-function clearAuth(){ const l=L(); delete l.auth; Lsave(l) }
+function clearAuth(){ const l=L(); delete l.auth; Lsave(l); clearTok(); }
 
 /* ---- accounts ---- */
 async function findPlayer(name){
-  const rows=await sbGet('sats_players?select=*&name_key=eq.'+encodeURIComponent(nameKey(name)));
+  const rows=await sbGet('sats_players?select=id,uid,name,name_key,avatar,role&name_key=eq.'+encodeURIComponent(nameKey(name)));
   return rows[0]||null;
 }
 async function signUp(name,pass,avatar){
   name=String(name).trim();
   if(name.length<2) throw new Error('Please use at least 2 letters for your name.');
-  if(String(pass).length<4) throw new Error('Your password needs at least 4 characters.');
-  if(await findPlayer(name)) throw new Error('That name is already taken — try logging in instead.');
-  const hash=await passHash(name,pass);
-  await sbPost('sats_players',{name:name,name_key:nameKey(name),avatar:avatar||'🦊',pass_hash:hash},{Prefer:'return=minimal'});
-  const a={name:name,key:nameKey(name),avatar:avatar||'🦊',hash:hash};
+  if(String(pass).length<8) throw new Error('Your password needs at least 8 characters.');
+  const p=await authCall('signup',name,pass,avatar||'\ud83e\udd8a');
+  const a={name:p.name,key:nameKey(p.name),avatar:p.avatar||'\ud83e\udd8a'};
   setAuth(a); return a;
 }
 async function logIn(name,pass){
-  const hash=await passHash(name,pass);
-  let row=null,netErr=null;
-  try{ row=await findPlayer(name); }catch(e){ netErr=e }
-  if(row){
-    if(row.pass_hash!==hash) throw new Error('That password does not match. Try again.');
-    const a={name:row.name,key:row.name_key,avatar:row.avatar||'🦊',hash:hash};
-    setAuth(a); return a;
-  }
-  if(netErr){ // offline: allow back in if this device has seen them before
-    const l=L(), cached=(l.known||{})[nameKey(name)];
-    if(cached&&cached.hash===hash){ setAuth(cached); return cached }
-    throw new Error("Can't reach the internet, and this computer doesn't know that login yet.");
-  }
-  throw new Error('No account with that name yet — tap “New account”.');
+  const p=await authCall('login',name,pass);
+  const a={name:p.name,key:nameKey(p.name),avatar:p.avatar||'\ud83e\udd8a'};
+  setAuth(a); return a;
 }
 function rememberDevice(a){ const l=L(); l.known=l.known||{}; l.known[a.key]=a; Lsave(l) }
 
@@ -443,7 +430,7 @@ async function flushQueue(){
 /* rows from the cloud, newest last; falls back to this device's cache when offline */
 async function loadSessions(key){
   try{
-    const rows=await sbGet('sats_sessions?select=*&player_key=eq.'+encodeURIComponent(key)+'&order=played_at.asc&limit=1000');
+    const rows=await sbGet('sats_sessions?select=id,player_key,subject,paper,score,total,played_at,detail&player_key=eq.'+encodeURIComponent(key)+'&order=played_at.asc&limit=1000');
     const mapped=rows.map(r=>({
       client_id:r.client_id, date:new Date(r.played_at).getTime(), player:r.player, player_key:r.player_key,
       subj:r.subject, mode:r.mode, year:r.year, paper:r.paper, topicFilter:r.topic_filter,
@@ -484,27 +471,20 @@ function parentKey(n){ return P_PREFIX+nameKey(n) }
 async function parentSignUp(name,pass){
   name=String(name).trim();
   if(name.length<2) throw new Error('Please use at least 2 letters for your name.');
-  if(String(pass).length<6) throw new Error('Use at least 6 characters for a grown-up password.');
-  const rows=await sbGet('sats_players?select=id&name_key=eq.'+encodeURIComponent(parentKey(name)));
-  if(rows.length) throw new Error('A parent account with that name already exists — log in instead.');
-  const hash=await sha256(parentKey(name)+':'+String(pass));
-  await sbPost('sats_players',{name:name,name_key:parentKey(name),avatar:'👩‍🏫',pass_hash:hash},{Prefer:'return=minimal'});
-  const a={name:name,key:parentKey(name),avatar:'👩‍🏫',hash:hash,parent:true};
+  if(String(pass).length<8) throw new Error('Use at least 8 characters for a grown-up password.');
+  const p=await authCall('signup',parentKey(name),pass,'\ud83d\udc69\u200d\ud83c\udfeb');
+  const a={name:name,key:parentKey(name),avatar:'\ud83d\udc69\u200d\ud83c\udfeb',parent:true};
   Lsave(Object.assign(L(),{parent:a}));
   return a;
 }
 async function parentLogIn(name,pass){
-  const hash=await sha256(parentKey(name)+':'+String(pass));
-  const rows=await sbGet('sats_players?select=*&name_key=eq.'+encodeURIComponent(parentKey(name)));
-  const row=rows[0];
-  if(!row) throw new Error('No parent account with that name — create one first.');
-  if(row.pass_hash!==hash) throw new Error('That password does not match.');
-  const a={name:row.name,key:row.name_key,avatar:row.avatar||'👩‍🏫',hash:hash,parent:true};
+  const p=await authCall('login',parentKey(name),pass);
+  const a={name:p.name,key:parentKey(name),avatar:p.avatar||'\ud83d\udc69\u200d\ud83c\udfeb',parent:true};
   Lsave(Object.assign(L(),{parent:a}));
   return a;
 }
 function parentAuthed(){ const l=L(); return (l.parent&&l.parent.key)?l.parent:null }
-function parentLogout(){ const l=L(); delete l.parent; Lsave(l) }
+function parentLogout(){ const l=L(); delete l.parent; Lsave(l); clearTok(); }
 async function listChildren(){
   const rows=await sbGet('sats_players?select=name,name_key,avatar&order=name.asc&limit=500');
   return rows.filter(r=>r.name_key&&r.name_key.indexOf(P_PREFIX)!==0);
